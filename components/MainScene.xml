@@ -11,13 +11,20 @@
       translation="[100,10]"
       width="600"
       height="40"
-      hintText="Search..."/>
+      hintText="Search…"/>
     <Button
       id="SearchButton"
       translation="[720,10]"
       width="120"
       height="40"
       text="Search"/>
+    <ActivityIndicator
+      id="Spinner"
+      translation="[860,10]"
+      width="40"
+      height="40"
+      visible="false"/>
+    <SearchTask id="SearchTaskNode" />
 
     <Poster
       id="Poster"

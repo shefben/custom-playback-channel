@@ -7,12 +7,16 @@ sub init()
     m.searchBox = m.top.FindNode("SearchBox")
     m.searchButton = m.top.FindNode("SearchButton")
     m.poster = m.top.FindNode("Poster")
+    m.spinner = m.top.FindNode("Spinner")
+    m.searchTask = m.top.FindNode("SearchTaskNode")
+    m.searchTask.ObserveField("message", "onSearchResults")
     m.searchButton.ObserveField("buttonSelected", "onSearchPress")
     m.list.ObserveField("itemFocused", "onItemFocused")
     m.player.visible = false
     m.searchBox.setFocus(true)
     m.itemfocused = 0
     m.baseUrl = "https://hydrahd.sh"
+    m.searchTask.baseUrl = m.baseUrl
     m.isEpisodeList = false
 end sub
 
@@ -35,9 +39,9 @@ function onKeyEvent(key as String, press as Boolean) as boolean
         return true
       end if
       if m.list.visible
-        if m.list.ItemFocused = m.itemfocused and not m.isEpisodeList
-          m.list.visible = false
-          m.player.setfocus(true)
+          if m.list.ItemFocused = m.itemfocused and not m.isEpisodeList
+            m.list.visible = false
+            m.searchBox.setFocus(true)
         else if m.isEpisodeList
           epContent = m.list.content.getChild(m.list.itemfocused)
           if epContent.description = "header" return true
@@ -89,9 +93,9 @@ function onKeyEvent(key as String, press as Boolean) as boolean
         m.isEpisodeList = false
         m.list.jumpToItem(m.itemfocused)
         return true
-      else if m.list.visible = true
-        m.list.visible = false
-        m.player.setfocus(true)
+        else if m.list.visible = true
+          m.list.visible = false
+          m.searchBox.setFocus(true)
         return true
       else
         m.list.visible = true
@@ -143,10 +147,13 @@ end sub
 
 sub onSearchPress()
     query = m.searchBox.text
-    SearchVideos(query)
-end sub
+    if query = invalid or Len(query) = 0 return
+    m.spinner.visible = true
+    m.searchTask.query = query
+    m.searchTask.control = "run"
+  end sub
 
-sub SearchVideos(query as String)
+  sub SearchVideos(query as String)
     if query = invalid or Len(query) = 0 return
     transfer = CreateObject("roUrlTransfer")
     encoded = transfer.Escape(query)
@@ -157,6 +164,23 @@ sub SearchVideos(query as String)
     html = transfer.GetToString()
     if html <> invalid
         LoadVideoList(html)
+    end if
+  end sub
+
+sub onSearchResults()
+    m.spinner.visible = false
+    html = m.searchTask.message
+    if html <> invalid and Len(html) > 0
+        LoadVideoList(html)
+    else
+        empty = CreateObject("roSGNode", "ContentNode")
+        n = empty.CreateChild("ContentNode")
+        n.title = "No matches"
+        m.list.content = empty
+        m.originalContent = empty
+        m.list.visible = true
+        m.list.setFocus(true)
+        m.player.visible = false
     end if
 end sub
 
