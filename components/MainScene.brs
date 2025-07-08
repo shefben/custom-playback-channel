@@ -11,6 +11,7 @@ sub init()
     m.hostTimer = m.top.FindNode("HostMessageTimer")
     m.hostTimer.ObserveField("fire", "onHostTimerFire")
     m.spinner = m.top.FindNode("Spinner")
+    m.statusLabel = m.top.FindNode("StatusLabel")
     m.searchTask = m.top.FindNode("SearchTaskNode")
     m.searchTask.ObserveField("message", "onSearchResults")
     m.episodeTask = m.top.FindNode("EpisodeTaskNode")
@@ -27,6 +28,7 @@ sub init()
     m.searchTask.baseUrl = m.baseUrl
     m.isEpisodeList = false
     m.pendingContent = invalid
+    m.resumeOnMenuClose = false
 end sub
 
 'Handle remote control key presses'
@@ -50,6 +52,7 @@ function onKeyEvent(key as String, press as Boolean) as boolean
         if m.list.visible
             if m.list.ItemFocused = m.itemfocused and not m.isEpisodeList
               m.list.visible = false
+              ResumeFromMenu()
               m.searchBox.setFocus(true)
           else if m.isEpisodeList
             epContent = m.list.content.getChild(m.list.itemfocused)
@@ -92,11 +95,13 @@ function onKeyEvent(key as String, press as Boolean) as boolean
         return true
         else if m.list.visible = true
           m.list.visible = false
+          ResumeFromMenu()
           m.searchBox.setFocus(true)
         return true
       else
         m.list.visible = true
         m.list.setfocus(true)
+        PauseForMenu()
         return true
       end if
     else
@@ -126,6 +131,7 @@ sub LoadVideoList(html as String)
     m.originalContent = listContent
     m.list.visible = true
     m.list.setFocus(true)
+    PauseForMenu()
     m.player.visible = false
 end sub
 
@@ -238,6 +244,27 @@ sub onHostTimerFire()
     end if
 end sub
 
+sub UpdateStatusOverlay()
+    if m.statusLabel = invalid return
+    state = "Stopped"
+    if m.player.control = "pause" then
+        state = "Paused"
+    else if m.player.control = "play" or m.player.control = "resume" then
+        state = "Playing"
+    end if
+    hostCount = 1
+    hostIndex = m.currentHostIndex + 1
+    if m.player.content <> invalid and m.player.content.hosts <> invalid then
+        hostCount = m.player.content.hosts.Count()
+    end if
+    text = state + " - Host " + Str(hostIndex)
+    if hostCount > 1 then
+        text = text + " of " + Str(hostCount)
+    end if
+    m.statusLabel.text = text
+    m.statusLabel.visible = true
+end sub
+
 sub onVideoStateChanged()
     if m.player.state = "error" then
         SwitchHost()
@@ -343,19 +370,23 @@ sub StartVideo(content as Object, resetIndex = true as Boolean)
     content.streamformat = DetermineFormat(content.url)
     m.player.visible = true
     m.player.control = "play"
+    UpdateStatusOverlay()
 end sub
 
 sub PauseVideo()
     m.player.control = "pause"
+    UpdateStatusOverlay()
 end sub
 
 sub ResumeVideo()
     m.player.control = "resume"
+    UpdateStatusOverlay()
 end sub
 
 sub StopVideo()
     m.player.control = "stop"
     m.player.visible = false
+    UpdateStatusOverlay()
 end sub
 
 sub FastForward()
@@ -364,6 +395,21 @@ end sub
 
 sub Rewind()
     m.player.trickPlayFactor = -4
+end sub
+
+sub PauseForMenu()
+    m.resumeOnMenuClose = false
+    if m.player.visible = true and (m.player.control = "play" or m.player.control = "resume") then
+        PauseVideo()
+        m.resumeOnMenuClose = true
+    end if
+end sub
+
+sub ResumeFromMenu()
+    if m.resumeOnMenuClose and m.player.control = "pause" then
+        ResumeVideo()
+    end if
+    m.resumeOnMenuClose = false
 end sub
 
 'Parse episode links from a watch page'

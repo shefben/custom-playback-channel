@@ -11,13 +11,17 @@
       translation="[100,10]"
       width="600"
       height="40"
-      hintText="Search…"/>
+      hintText="Search…"
+      focusedColor="0xFFFFFFFF"
+      textColor="0x888888"/>
     <Button
       id="SearchButton"
       translation="[720,10]"
       width="120"
       height="40"
-      text="Search"/>
+      text="Search"
+      focusedTextColor="0xFFFFFFFF"
+      textColor="0x888888"/>
     <ActivityIndicator
       id="Spinner"
       translation="[860,10]"
@@ -47,20 +51,29 @@
       repeat="false"
       duration="2"/>
 
+    <Label
+      id="StatusLabel"
+      translation="[100,650]"
+      width="600"
+      height="40"
+      visible="false"/>
+
     <!-- video -->
     <Video
       id="Video"
       visible="true"
       width="1920"
       height="1080"
-      translation="[0,0]"/>
+      translation="[0,0]"
+      focusBitmapUri="pkg:/images/mm-icon-focus-hd.jpg"/>
 
     <!-- menu -->
     <LabelList
       id="MenuList"
       translation="[100,80]"
       itemSize="[600,100]"
-      visible="false">
+      visible="false"
+      focusBitmapUri="pkg:/images/mm-icon-side-hd.jpg">
       <ContentNode id="menucontent" role="content" />
     </LabelList>
   </children>
