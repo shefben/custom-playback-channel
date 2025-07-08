@@ -7,11 +7,15 @@ sub init()
     m.searchBox = m.top.FindNode("SearchBox")
     m.searchButton = m.top.FindNode("SearchButton")
     m.poster = m.top.FindNode("Poster")
+    m.hostLabel = m.top.FindNode("HostMessage")
+    m.hostTimer = m.top.FindNode("HostMessageTimer")
+    m.hostTimer.ObserveField("fire", "onHostTimerFire")
     m.spinner = m.top.FindNode("Spinner")
     m.searchTask = m.top.FindNode("SearchTaskNode")
     m.searchTask.ObserveField("message", "onSearchResults")
     m.searchButton.ObserveField("buttonSelected", "onSearchPress")
     m.list.ObserveField("itemFocused", "onItemFocused")
+    m.player.ObserveField("state", "onVideoStateChanged")
     m.player.visible = false
     m.searchBox.setFocus(true)
     m.itemfocused = 0
@@ -44,13 +48,12 @@ function onKeyEvent(key as String, press as Boolean) as boolean
             m.searchBox.setFocus(true)
         else if m.isEpisodeList
           epContent = m.list.content.getChild(m.list.itemfocused)
-          if epContent.description = "header" return true
+          if epContent.isHeader = true return true
           m.itemfocused = m.list.itemfocused
           StopVideo()
           hosts = GetHostsForVideo(epContent.url)
           epContent.hosts = hosts
           epContent.url = hosts[0]
-          m.currentHostIndex = 0
           StartVideo(epContent)
         else
           m.itemfocused = m.list.itemfocused
@@ -64,11 +67,10 @@ function onKeyEvent(key as String, press as Boolean) as boolean
             m.list.jumpToItem(0)
           else
             StopVideo()
-            hosts = GetHostsForVideo(selectedContent.url)
-            selectedContent.hosts = hosts
-            selectedContent.url = hosts[0]
-            m.currentHostIndex = 0
-            StartVideo(selectedContent)
+              hosts = GetHostsForVideo(selectedContent.url)
+              selectedContent.hosts = hosts
+              selectedContent.url = hosts[0]
+              StartVideo(selectedContent)
           end if
         end if
       end if
@@ -178,7 +180,30 @@ sub SwitchHost()
         m.currentHostIndex = (m.currentHostIndex + 1) mod hosts.Count()
         content.url = hosts[m.currentHostIndex]
         content.streamformat = DetermineFormat(content.url)
-        StartVideo(content)
+        StartVideo(content, false)
+        ShowHostMessage("Switching host " + Str(m.currentHostIndex + 1) + " of " + Str(hosts.Count()))
+    end if
+end sub
+
+sub ShowHostMessage(msg as String)
+    if m.hostLabel <> invalid
+        m.hostLabel.text = msg
+        m.hostLabel.visible = true
+        if m.hostTimer <> invalid
+            m.hostTimer.control = "start"
+        end if
+    end if
+end sub
+
+sub onHostTimerFire()
+    if m.hostLabel <> invalid
+        m.hostLabel.visible = false
+    end if
+end sub
+
+sub onVideoStateChanged()
+    if m.player.state = "error" then
+        SwitchHost()
     end if
 end sub
 
@@ -244,9 +269,17 @@ function HttpGet(url as String) as dynamic
 end function
 
 'Playback helper functions
-sub StartVideo(content as Object)
+sub StartVideo(content as Object, resetIndex = true as Boolean)
+    if resetIndex
+        m.currentHostIndex = 0
+    end if
+    if content.hosts <> invalid
+        m.player.content = content
+        m.player.content.hosts = content.hosts
+    else
+        m.player.content = content
+    end if
     content.streamformat = DetermineFormat(content.url)
-    m.player.content = content
     m.player.visible = true
     m.player.control = "play"
 end sub
@@ -298,6 +331,8 @@ function ParseEpisodeList(html as String, baseUrl as String) as object
         header = list.CreateChild("ContentNode")
         header.title = "Season " + s
         header.description = "header"
+        header.AddField("isHeader", "bool", false)
+        header.isHeader = true
         eps = seasonMap[s]
         eps.Sort(function(a as Object, b as Object)
             return a.num < b.num

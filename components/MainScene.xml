@@ -33,6 +33,18 @@
       height="513"
       visible="false"/>
 
+    <Label
+      id="HostMessage"
+      translation="[100,600]"
+      width="600"
+      height="40"
+      visible="false"/>
+
+    <Timer
+      id="HostMessageTimer"
+      repeat="false"
+      duration="2"/>
+
     <!-- video -->
     <Video
       id="Video"
