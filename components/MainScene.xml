@@ -25,6 +25,8 @@
       height="40"
       visible="false"/>
     <SearchTask id="SearchTaskNode" />
+    <EpisodeTask id="EpisodeTaskNode" />
+    <HostTask id="HostTaskNode" />
 
     <Poster
       id="Poster"
