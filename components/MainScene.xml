@@ -5,7 +5,28 @@
 <component name="MainScene" extends="Scene">
 
   <children>
-  	<!-- video -->
+    <!-- search form -->
+    <TextEditBox
+      id="SearchBox"
+      translation="[100,10]"
+      width="600"
+      height="40"
+      hintText="Search..."/>
+    <Button
+      id="SearchButton"
+      translation="[720,10]"
+      width="120"
+      height="40"
+      text="Search"/>
+
+    <Poster
+      id="Poster"
+      translation="[750,80]"
+      width="342"
+      height="513"
+      visible="false"/>
+
+    <!-- video -->
     <Video
       id="Video"
       visible="true"
@@ -16,47 +37,10 @@
     <!-- menu -->
     <LabelList
       id="MenuList"
-      translation="[100,50]"
+      translation="[100,80]"
       itemSize="[600,100]"
       visible="false">
-      <ContentNode id="menucontent" role="content">
-        <ContentNode
-          title="Jeff Han Demos his Breakthrough Touchscreen"
-          url="http://video.ted.com/talks/podcast/JeffHan_2006_480.mp4"
-          description="mp4" />
-        <ContentNode
-          title="David Kelley on Human-Centered Design"
-          url="http://video.ted.com/talks/podcast/DavidKelley_2002_480.mp4"
-          description="mp4" />
-        <ContentNode
-          title="Imogen Heap Plays 'Wait It Out'"
-          url="http://video.ted.com/talks/podcast/ImogenHeap_WaitItOut_2009G_480.mp4"
-          description="mp4" />
-        <ContentNode
-          title="Naturally 7 Beatboxes a Whole Band"
-          url="http://video.ted.com/talks/podcast/Naturally7FLYBABY_2009_480.mp4"
-          description="mp4" />
-        <ContentNode
-          title="Juan Enriquez Wants to Grow Energy"
-          url="http://video.ted.com/talks/podcast/JuanEnriquez_2007S_480.mp4"
-          description="mp4" />
-        <ContentNode
-          title="INSERT CONTENT HERE"
-          url="http://video.ted.com/talks/podcast/JeffHan_2006_480.mp4"
-          description="mp4" />
-        <ContentNode
-          title="INSERT CONTENT HERE"
-          url="http://video.ted.com/talks/podcast/JeffHan_2006_480.mp4"
-          description="mp4" />
-        <ContentNode
-          title="INSERT CONTENT HERE"
-          url="http://video.ted.com/talks/podcast/JeffHan_2006_480.mp4"
-          description="mp4" />
-        <ContentNode
-          title="INSERT CONTENT HERE"
-          url="http://video.ted.com/talks/podcast/JeffHan_2006_480.mp4"
-          description="mp4" />
-      </ContentNode>
+      <ContentNode id="menucontent" role="content" />
     </LabelList>
   </children>
 
