@@ -163,6 +163,7 @@ sub onSearchResults()
     if html <> invalid and Len(html) > 0
         LoadVideoList(html)
     else
+        Log("SearchTask returned no results")
         empty = CreateObject("roSGNode", "ContentNode")
         n = empty.CreateChild("ContentNode")
         n.title = "No matches"
@@ -188,6 +189,7 @@ sub onEpisodeResults()
             return
         end if
     else
+        Log("EpisodeTask returned no data")
         ShowHostMessage("Failed to load episodes")
     end if
     if selectedContent <> invalid
@@ -209,9 +211,11 @@ sub onHostResults()
             content.url = hosts[0]
             StartVideo(content)
         else
+            Log("HostTask returned no hosts")
             ShowHostMessage("No hosts found")
         end if
     else
+        Log("HostTask failed to load hosts")
         ShowHostMessage("Failed to load hosts")
     end if
 end sub
@@ -223,6 +227,7 @@ sub SwitchHost()
         m.currentHostIndex = (m.currentHostIndex + 1) mod hosts.Count()
         content.url = hosts[m.currentHostIndex]
         content.streamformat = DetermineFormat(content.url)
+        Log("Switching host to " + content.url)
         StartVideo(content, false)
         ShowHostMessage("Switching host " + Str(m.currentHostIndex + 1) + " of " + Str(hosts.Count()))
     end if
@@ -361,6 +366,7 @@ sub StartVideo(content as Object, resetIndex = true as Boolean)
     if resetIndex
         m.currentHostIndex = 0
     end if
+    Log("Starting playback: " + content.url)
     if content.hosts <> invalid
         m.player.content = content
         m.player.content.hosts = content.hosts
@@ -384,6 +390,7 @@ sub ResumeVideo()
 end sub
 
 sub StopVideo()
+    Log("Stopping playback")
     m.player.control = "stop"
     m.player.visible = false
     UpdateStatusOverlay()
