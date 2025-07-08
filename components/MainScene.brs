@@ -190,11 +190,20 @@ function GetHostsForVideo(pageUrl as String) as object
     xfer.SetUrl(pageUrl)
     html = xfer.GetToString()
     if html <> invalid
-        hostRegex = CreateObject("roRegex", "https?://[^\"']+(mp4|m3u8)", "ims")
-        matches = hostRegex.MatchAll(html)
+        btnRegex = CreateObject("roRegex", "iframe-server-button[^>]*data-link=\"([^\"]+)\"", "ims")
+        matches = btnRegex.MatchAll(html)
         for each m in matches
-            hosts.Push(m[0])
+            link = m[1]
+            if Left(link,1) = "/" then link = m.baseUrl + link
+            hosts.Push(link)
         end for
+        if hosts.Count() = 0
+            hostRegex = CreateObject("roRegex", "https?://[^\"']+(mp4|m3u8)", "ims")
+            matches = hostRegex.MatchAll(html)
+            for each m in matches
+                hosts.Push(m[0])
+            end for
+        end if
     end if
     if hosts.Count() = 0
         hosts.Push(pageUrl)
