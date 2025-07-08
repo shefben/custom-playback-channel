@@ -113,29 +113,16 @@ end function
 'load video list from web page'
 
 sub LoadVideoList(html as String)
-    figureRegex = CreateObject("roRegex", "<figure class=\"figured\">(.*?)</figure>", "ims")
-    hrefRegex = CreateObject("roRegex", "href=\"([^\"]+)\"", "ims")
-    imgRegex = CreateObject("roRegex", "(?:data-src|src)=\"([^\"]+)\"", "ims")
-    titleRegex = CreateObject("roRegex", "<div class=\"title detz\">([^<]+)</div>", "ims")
     listContent = CreateObject("roSGNode", "ContentNode")
-
-    figures = figureRegex.MatchAll(html)
-    for each item in figures
-        block = item[1]
-        hrefMatch = hrefRegex.Match(block)
-        imgMatch = imgRegex.Match(block)
-        titleMatch = titleRegex.Match(block)
-        if hrefMatch.Count() > 0 and imgMatch.Count() > 0 and titleMatch.Count() > 0
-            node = listContent.CreateChild("ContentNode")
-            path = hrefMatch[1]
-            if Left(path,1) = "/" then path = m.baseUrl + path
-            node.title = titleMatch[1]
-            node.url = path
-            node.description = "mp4"
-            node.hdposterurl = imgMatch[1]
-            node.AddField("hosts", "string", true)
-            node.hosts = [ path ]
-        end if
+    results = ParseSearchResults(html, m.baseUrl)
+    for each item in results
+        node = listContent.CreateChild("ContentNode")
+        node.title = item.title
+        node.url = item.pageUrl
+        node.description = "mp4"
+        node.hdposterurl = item.imgUrl
+        node.AddField("hosts", "string", true)
+        node.hosts = [ item.pageUrl ]
     end for
 
     m.list.content = listContent
