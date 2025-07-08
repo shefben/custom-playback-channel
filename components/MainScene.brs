@@ -13,6 +13,10 @@ sub init()
     m.spinner = m.top.FindNode("Spinner")
     m.searchTask = m.top.FindNode("SearchTaskNode")
     m.searchTask.ObserveField("message", "onSearchResults")
+    m.episodeTask = m.top.FindNode("EpisodeTaskNode")
+    m.episodeTask.ObserveField("message", "onEpisodeResults")
+    m.hostTask = m.top.FindNode("HostTaskNode")
+    m.hostTask.ObserveField("message", "onHostResults")
     m.searchButton.ObserveField("buttonSelected", "onSearchPress")
     m.list.ObserveField("itemFocused", "onItemFocused")
     m.player.ObserveField("state", "onVideoStateChanged")
@@ -22,6 +26,7 @@ sub init()
     m.baseUrl = "https://hydrahd.sh"
     m.searchTask.baseUrl = m.baseUrl
     m.isEpisodeList = false
+    m.pendingContent = invalid
 end sub
 
 'Handle remote control key presses'
@@ -42,38 +47,28 @@ function onKeyEvent(key as String, press as Boolean) as boolean
         onSearchPress()
         return true
       end if
-      if m.list.visible
-          if m.list.ItemFocused = m.itemfocused and not m.isEpisodeList
-            m.list.visible = false
-            m.searchBox.setFocus(true)
-        else if m.isEpisodeList
-          epContent = m.list.content.getChild(m.list.itemfocused)
-          if epContent.isHeader = true return true
-          m.itemfocused = m.list.itemfocused
-          StopVideo()
-          hosts = GetHostsForVideo(epContent.url)
-          epContent.hosts = hosts
-          epContent.url = hosts[0]
-          StartVideo(epContent)
-        else
-          m.itemfocused = m.list.itemfocused
-          selectedContent = m.list.content.getChild(m.list.itemfocused)
-          html = HttpGet(selectedContent.url)
-          episodes = ParseEpisodeList(html, m.baseUrl)
-          if episodes <> invalid and episodes.Count() > 0
-            m.originalContent = m.list.content
-            m.list.content = episodes
-            m.isEpisodeList = true
-            m.list.jumpToItem(0)
-          else
+        if m.list.visible
+            if m.list.ItemFocused = m.itemfocused and not m.isEpisodeList
+              m.list.visible = false
+              m.searchBox.setFocus(true)
+          else if m.isEpisodeList
+            epContent = m.list.content.getChild(m.list.itemfocused)
+            if epContent.isHeader = true return true
+            m.itemfocused = m.list.itemfocused
             StopVideo()
-              hosts = GetHostsForVideo(selectedContent.url)
-              selectedContent.hosts = hosts
-              selectedContent.url = hosts[0]
-              StartVideo(selectedContent)
+            m.pendingContent = epContent
+            m.spinner.visible = true
+            m.hostTask.url = epContent.url
+            m.hostTask.control = "run"
+          else
+            m.itemfocused = m.list.itemfocused
+            selectedContent = m.list.content.getChild(m.list.itemfocused)
+            m.pendingContent = selectedContent
+            m.spinner.visible = true
+            m.episodeTask.url = selectedContent.url
+            m.episodeTask.control = "run"
           end if
         end if
-      end if
     else if key = "play"
       if m.player.control = "pause"
         ResumeVideo()
@@ -173,6 +168,48 @@ sub onSearchResults()
     end if
 end sub
 
+sub onEpisodeResults()
+    m.spinner.visible = false
+    html = m.episodeTask.message
+    selectedContent = m.pendingContent
+    if html <> invalid and Len(html) > 0
+        episodes = ParseEpisodeList(html, m.baseUrl)
+        if episodes <> invalid and episodes.Count() > 0
+            m.originalContent = m.list.content
+            m.list.content = episodes
+            m.isEpisodeList = true
+            m.list.jumpToItem(0)
+            return
+        end if
+    else
+        ShowHostMessage("Failed to load episodes")
+    end if
+    if selectedContent <> invalid
+        StopVideo()
+        m.spinner.visible = true
+        m.hostTask.url = selectedContent.url
+        m.hostTask.control = "run"
+    end if
+end sub
+
+sub onHostResults()
+    m.spinner.visible = false
+    html = m.hostTask.message
+    content = m.pendingContent
+    if html <> invalid and Len(html) > 0
+        hosts = ParseHostsFromHtml(html, content.url)
+        if hosts <> invalid and hosts.Count() > 0
+            content.hosts = hosts
+            content.url = hosts[0]
+            StartVideo(content)
+        else
+            ShowHostMessage("No hosts found")
+        end if
+    else
+        ShowHostMessage("Failed to load hosts")
+    end if
+end sub
+
 sub SwitchHost()
     content = m.player.content
     hosts = content.hosts
@@ -225,6 +262,30 @@ function GetHostsForVideo(pageUrl as String) as object
     xfer.AddHeader("User-Agent", "Mozilla/5.0")
     xfer.SetUrl(pageUrl)
     html = xfer.GetToString()
+    if html <> invalid
+        btnRegex = CreateObject("roRegex", "iframe-server-button[^>]*data-link=\"([^\"]+)\"", "ims")
+        matches = btnRegex.MatchAll(html)
+        for each m in matches
+            link = m[1]
+            if Left(link,1) = "/" then link = m.baseUrl + link
+            hosts.Push(link)
+        end for
+        if hosts.Count() = 0
+            hostRegex = CreateObject("roRegex", "https?://[^\"']+(mp4|m3u8)", "ims")
+            matches = hostRegex.MatchAll(html)
+            for each m in matches
+                hosts.Push(m[0])
+            end for
+        end if
+    end if
+    if hosts.Count() = 0
+        hosts.Push(pageUrl)
+    end if
+    return hosts
+end function
+
+function ParseHostsFromHtml(html as String, pageUrl as String) as object
+    hosts = []
     if html <> invalid
         btnRegex = CreateObject("roRegex", "iframe-server-button[^>]*data-link=\"([^\"]+)\"", "ims")
         matches = btnRegex.MatchAll(html)
