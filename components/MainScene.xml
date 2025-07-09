@@ -22,6 +22,22 @@
       text="Search"
       focusedTextColor="0xFFFFFFFF"
       textColor="0x888888"/>
+    <Button
+      id="EpisodeButton"
+      translation="[720,60]"
+      width="120"
+      height="40"
+      text="Load Episodes"
+      focusedTextColor="0xFFFFFFFF"
+      textColor="0x888888"/>
+    <Button
+      id="HostsButton"
+      translation="[860,60]"
+      width="120"
+      height="40"
+      text="Load Hosts"
+      focusedTextColor="0xFFFFFFFF"
+      textColor="0x888888"/>
     <ActivityIndicator
       id="Spinner"
       translation="[860,10]"
@@ -75,6 +91,13 @@
       visible="false"
       focusBitmapUri="pkg:/images/mm-icon-side-hd.jpg">
       <ContentNode id="menucontent" role="content" />
+    </LabelList>
+    <LabelList
+      id="HostList"
+      translation="[100,300]"
+      itemSize="[400,40]"
+      visible="false">
+      <ContentNode id="hostcontent" role="content" />
     </LabelList>
   </children>
 

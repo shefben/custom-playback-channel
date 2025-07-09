@@ -6,6 +6,8 @@ sub init()
     m.list = m.top.FindNode("MenuList")
     m.searchBox = m.top.FindNode("SearchBox")
     m.searchButton = m.top.FindNode("SearchButton")
+    m.episodeButton = m.top.FindNode("EpisodeButton")
+    m.hostsButton = m.top.FindNode("HostsButton")
     m.poster = m.top.FindNode("Poster")
     m.hostLabel = m.top.FindNode("HostMessage")
     m.hostTimer = m.top.FindNode("HostMessageTimer")
@@ -19,6 +21,16 @@ sub init()
     m.hostTask = m.top.FindNode("HostTaskNode")
     m.hostTask.ObserveField("message", "onHostResults")
     m.searchButton.ObserveField("buttonSelected", "onSearchPress")
+    if m.episodeButton <> invalid
+        m.episodeButton.ObserveField("buttonSelected", "onEpisodeButtonPress")
+    end if
+    if m.hostsButton <> invalid
+        m.hostsButton.ObserveField("buttonSelected", "onHostsButtonPress")
+    end if
+    m.hostList = m.top.FindNode("HostList")
+    if m.hostList <> invalid
+        m.hostList.ObserveField("itemSelected", "onHostListSelect")
+    end if
     m.list.ObserveField("itemFocused", "onItemFocused")
     m.player.ObserveField("state", "onVideoStateChanged")
     m.player.visible = false
@@ -29,6 +41,7 @@ sub init()
     m.isEpisodeList = false
     m.pendingContent = invalid
     m.resumeOnMenuClose = false
+    m.prefetchTasks = []
 end sub
 
 'Handle remote control key presses'
@@ -36,7 +49,11 @@ function onKeyEvent(key as String, press as Boolean) as boolean
   print key + ":" ; press
   if press
     if key = "options"
-      SwitchHost()
+      if m.hostList.visible
+        HideHostList()
+      else
+        ShowHostList()
+      end if
       return true
     else if key = "up" and m.list.visible = true and not m.searchBox.hasFocus()
       m.searchBox.setFocus(true)
@@ -129,6 +146,7 @@ sub LoadVideoList(html as String)
 
     m.list.content = listContent
     m.originalContent = listContent
+    PrefetchEpisodes(listContent)
     m.list.visible = true
     m.list.setFocus(true)
     PauseForMenu()
@@ -138,10 +156,29 @@ end sub
 sub onSearchPress()
     query = m.searchBox.text
     if query = invalid or Len(query) = 0 return
+    ShowStatusMessage("Searching...")
     m.spinner.visible = true
     m.searchTask.query = query
     m.searchTask.control = "run"
   end sub
+
+sub onEpisodeButtonPress()
+    url = m.searchBox.text
+    if url = invalid or Len(url) = 0 return
+    ShowStatusMessage("Loading episodes...")
+    m.spinner.visible = true
+    m.episodeTask.url = url
+    m.episodeTask.control = "run"
+end sub
+
+sub onHostsButtonPress()
+    url = m.searchBox.text
+    if url = invalid or Len(url) = 0 return
+    ShowStatusMessage("Loading hosts...")
+    m.spinner.visible = true
+    m.hostTask.url = url
+    m.hostTask.control = "run"
+end sub
 
   sub SearchVideos(query as String)
     if query = invalid or Len(query) = 0 return
@@ -159,11 +196,12 @@ sub onSearchPress()
 
 sub onSearchResults()
     m.spinner.visible = false
+    ShowStatusMessage("Search complete")
     html = m.searchTask.message
     if html <> invalid and Len(html) > 0
         LoadVideoList(html)
     else
-        Log("SearchTask returned no results")
+        LogError("SearchTask returned no results")
         empty = CreateObject("roSGNode", "ContentNode")
         n = empty.CreateChild("ContentNode")
         n.title = "No matches"
@@ -177,6 +215,7 @@ end sub
 
 sub onEpisodeResults()
     m.spinner.visible = false
+    ShowStatusMessage("Episodes loaded")
     html = m.episodeTask.message
     selectedContent = m.pendingContent
     if html <> invalid and Len(html) > 0
@@ -186,10 +225,11 @@ sub onEpisodeResults()
             m.list.content = episodes
             m.isEpisodeList = true
             m.list.jumpToItem(0)
+            PrefetchHosts(episodes)
             return
         end if
     else
-        Log("EpisodeTask returned no data")
+        LogError("EpisodeTask returned no data")
         ShowHostMessage("Failed to load episodes")
     end if
     if selectedContent <> invalid
@@ -202,20 +242,20 @@ end sub
 
 sub onHostResults()
     m.spinner.visible = false
+    ShowStatusMessage("Hosts loaded")
     html = m.hostTask.message
     content = m.pendingContent
     if html <> invalid and Len(html) > 0
         hosts = ParseHostsFromHtml(html, content.url)
         if hosts <> invalid and hosts.Count() > 0
             content.hosts = hosts
-            content.url = hosts[0]
             StartVideo(content)
         else
-            Log("HostTask returned no hosts")
+            LogError("HostTask returned no hosts")
             ShowHostMessage("No hosts found")
         end if
     else
-        Log("HostTask failed to load hosts")
+        LogError("HostTask failed to load hosts")
         ShowHostMessage("Failed to load hosts")
     end if
 end sub
@@ -224,13 +264,49 @@ sub SwitchHost()
     content = m.player.content
     hosts = content.hosts
     if hosts <> invalid and hosts.Count() > 1
-        m.currentHostIndex = (m.currentHostIndex + 1) mod hosts.Count()
-        content.url = hosts[m.currentHostIndex]
-        content.streamformat = DetermineFormat(content.url)
+        index = (m.currentHostIndex + 1) mod hosts.Count()
+        SwitchHostTo(index)
+    end if
+end sub
+
+sub SwitchHostTo(index as Integer)
+    content = m.player.content
+    hosts = content.hosts
+    if hosts <> invalid and index >= 0 and index < hosts.Count()
+        m.currentHostIndex = index
+        hostObj = hosts[index]
+        content.url = hostObj.url
+        content.streamformat = hostObj.format
         Log("Switching host to " + content.url)
         StartVideo(content, false)
-        ShowHostMessage("Switching host " + Str(m.currentHostIndex + 1) + " of " + Str(hosts.Count()))
+        ShowHostMessage("Switching host " + Str(index + 1) + " of " + Str(hosts.Count()))
     end if
+end sub
+
+sub ShowHostList()
+    content = m.player.content
+    hosts = content.hosts
+    if hosts = invalid or hosts.Count() = 0 return
+    list = CreateObject("roSGNode", "ContentNode")
+    idx = 0
+    for each h in hosts
+        node = list.CreateChild("ContentNode")
+        node.title = "Host " + Str(idx + 1) + " (" + h.format + ")"
+        idx = idx + 1
+    end for
+    m.hostList.content = list
+    m.hostList.visible = true
+    m.hostList.setFocus(true)
+end sub
+
+sub HideHostList()
+    m.hostList.visible = false
+end sub
+
+sub onHostListSelect()
+    idx = m.hostList.itemSelected
+    HideHostList()
+    SwitchHostTo(idx)
 end sub
 
 sub ShowHostMessage(msg as String)
@@ -270,6 +346,13 @@ sub UpdateStatusOverlay()
     m.statusLabel.visible = true
 end sub
 
+sub ShowStatusMessage(msg as String)
+    if m.statusLabel <> invalid
+        m.statusLabel.text = msg
+        m.statusLabel.visible = true
+    end if
+end sub
+
 sub onVideoStateChanged()
     if m.player.state = "error" then
         SwitchHost()
@@ -303,7 +386,7 @@ function GetHostsForVideo(pageUrl as String) as object
             hosts.Push(link)
         end for
         if hosts.Count() = 0
-            hostRegex = CreateObject("roRegex", "https?://[^\"']+(mp4|m3u8)", "ims")
+            hostRegex = CreateObject("roRegex", "https?://[^\"']+(mp4|m3u8|mpd)", "ims")
             matches = hostRegex.MatchAll(html)
             for each m in matches
                 hosts.Push(m[0])
@@ -324,18 +407,46 @@ function ParseHostsFromHtml(html as String, pageUrl as String) as object
         for each m in matches
             link = m[1]
             if Left(link,1) = "/" then link = m.baseUrl + link
-            hosts.Push(link)
+            host = { url: link, format: DetermineFormat(link) }
+            hosts.Push(host)
         end for
         if hosts.Count() = 0
-            hostRegex = CreateObject("roRegex", "https?://[^\"']+(mp4|m3u8)", "ims")
+            iframeRegex = CreateObject("roRegex", "<iframe[^>]+src=\"([^\"]+)\"", "ims")
+            matches = iframeRegex.MatchAll(html)
+            for each m in matches
+                link = m[1]
+                if Left(link,1) = "/" then link = m.baseUrl + link
+                host = { url: link, format: DetermineFormat(link) }
+                hosts.Push(host)
+            end for
+        end if
+        if hosts.Count() = 0
+            sourceRegex = CreateObject("roRegex", "<source[^>]+src=\"([^\"]+)\"", "ims")
+            matches = sourceRegex.MatchAll(html)
+            for each m in matches
+                host = { url: m[1], format: DetermineFormat(m[1]) }
+                hosts.Push(host)
+            end for
+        end if
+        if hosts.Count() = 0
+            urlVarRegex = CreateObject("roRegex", "['\"](https?://[^'\"]+(mp4|m3u8))['\"]", "ims")
+            matches = urlVarRegex.MatchAll(html)
+            for each m in matches
+                host = { url: m[1], format: DetermineFormat(m[1]) }
+                hosts.Push(host)
+            end for
+        end if
+        if hosts.Count() = 0
+            hostRegex = CreateObject("roRegex", "https?://[^\"']+(mp4|m3u8|mpd)", "ims")
             matches = hostRegex.MatchAll(html)
             for each m in matches
-                hosts.Push(m[0])
+                host = { url: m[0], format: DetermineFormat(m[0]) }
+                hosts.Push(host)
             end for
         end if
     end if
     if hosts.Count() = 0
-        hosts.Push(pageUrl)
+        hosts.Push({ url: pageUrl, format: DetermineFormat(pageUrl) })
     end if
     return hosts
 end function
@@ -363,17 +474,21 @@ end function
 
 'Playback helper functions
 sub StartVideo(content as Object, resetIndex = true as Boolean)
-    if resetIndex
+    if resetIndex then
         m.currentHostIndex = 0
     end if
-    Log("Starting playback: " + content.url)
-    if content.hosts <> invalid
-        m.player.content = content
-        m.player.content.hosts = content.hosts
+    if content.hosts <> invalid and content.hosts.Count() > 0 then
+        hostObj = content.hosts[m.currentHostIndex]
+        content.url = hostObj.url
+        content.streamformat = hostObj.format
     else
-        m.player.content = content
+        content.streamformat = DetermineFormat(content.url)
     end if
-    content.streamformat = DetermineFormat(content.url)
+    Log("Starting playback: " + content.url)
+    m.player.content = content
+    if content.hosts <> invalid then
+        m.player.content.hosts = content.hosts
+    end if
     m.player.visible = true
     m.player.control = "play"
     UpdateStatusOverlay()
@@ -417,6 +532,37 @@ sub ResumeFromMenu()
         ResumeVideo()
     end if
     m.resumeOnMenuClose = false
+end sub
+
+sub PrefetchEpisodes(listContent as Object)
+    limit = listContent.GetChildCount()
+    if limit > 3 then limit = 3
+    for i = 0 to limit - 1
+        item = listContent.GetChild(i)
+        if item.url <> invalid and CacheGet(item.url) = invalid
+            t = CreateObject("roSGNode", "EpisodeTask")
+            t.url = item.url
+            m.prefetchTasks.Push(t)
+            t.control = "run"
+        end if
+    end for
+end sub
+
+sub PrefetchHosts(listContent as Object)
+    limit = listContent.GetChildCount()
+    if limit > 3 then limit = 3
+    for i = 0 to limit - 1
+        item = listContent.GetChild(i)
+        if item.isHeader = true then
+            next
+        end if
+        if item.url <> invalid and CacheGet(item.url) = invalid
+            t = CreateObject("roSGNode", "HostTask")
+            t.url = item.url
+            m.prefetchTasks.Push(t)
+            t.control = "run"
+        end if
+    end for
 end sub
 
 'Parse episode links from a watch page'

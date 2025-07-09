@@ -7,10 +7,10 @@ function ParseSearchResults(html as String, baseUrl as String) as Object
     results = []
     if html = invalid return results
 
-    figureRegex = CreateObject("roRegex", "<figure class=\"figured\">(.*?)</figure>", "ims")
-    hrefRegex = CreateObject("roRegex", "href=\"([^\"]+)\"", "ims")
-    imgRegex = CreateObject("roRegex", "(?:data-src|src)=\"([^\"]+)\"", "ims")
-    titleRegex = CreateObject("roRegex", "<div class=\"title detz\">([^<]+)</div>", "ims")
+    figureRegex = CreateObject("roRegex", "<figure[^>]*class\\s*=\\s*\"figured\"[^>]*>(.*?)</figure>", "ims")
+    hrefRegex = CreateObject("roRegex", "<a[^>]+href=\"([^\"]+)\"", "ims")
+    imgRegex = CreateObject("roRegex", "<img[^>]+(?:data-src|src)=\"([^\"]+)\"", "ims")
+    titleRegex = CreateObject("roRegex", "<(?:div|figcaption)[^>]*class=\"title[^"]*\"[^>]*>([^<]+)<", "ims")
 
     figures = figureRegex.MatchAll(html)
     for each item in figures
